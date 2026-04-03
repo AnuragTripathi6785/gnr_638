@@ -2,12 +2,12 @@ train: ../train/images
 val: ../valid/images
 test: ../test/images
 
-nc: 4
-names: ['ball', 'goalkeeper', 'player', 'referee']
+nc: 6
+names: ['bike', 'car', 'cat', 'cellphone', 'dog', 'person']
 
 roboflow:
-  workspace: roboflow-jvuqo
-  project: football-players-detection-3zvbc
+  workspace: suyogs-workspace-voqgn
+  project: hocmay1-39isr
   version: 1
   license: CC BY 4.0
-  url: https://universe.roboflow.com/roboflow-jvuqo/football-players-detection-3zvbc/dataset/1
+  url: https://universe.roboflow.com/suyogs-workspace-voqgn/hocmay1-39isr/dataset/1

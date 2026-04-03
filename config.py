@@ -24,9 +24,9 @@ VALID_LABEL_DIR = os.path.join(DATA_ROOT, "valid", "labels")
 TEST_IMG_DIR    = os.path.join(DATA_ROOT, "test",  "images")
 TEST_LABEL_DIR  = os.path.join(DATA_ROOT, "test",  "labels")
 
-# Football Players Detection classes
-CLASS_NAMES = ["ball", "goalkeeper", "player", "referee"]
-NUM_CLASSES = len(CLASS_NAMES)  # C = 4
+# Hocmay dataset classes
+CLASS_NAMES = ["bike", "car", "cat", "cellphone", "dog", "person"]
+NUM_CLASSES = len(CLASS_NAMES)  # C = 6
 
 # ── YOLO Grid ────────────────────────────────────────────────────────────────
 S = 7           # Grid size  (S x S)
