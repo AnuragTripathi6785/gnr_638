@@ -27,12 +27,14 @@ from model import YOLOv1
 from utils import decode_predictions, nms
 
 
-# Colors for each class (RGBA-ish for visibility)
+# Colors for each class: bike, car, cat, cellphone, dog, person
 COLORS = [
-    (255, 0, 0),       # bike - red
-    (0, 255, 0),       # car - green
-    (0, 0, 255),       # person - blue
-    (255, 255, 0),     # tree - yellow
+    (255,  56,  56),   # bike       - red
+    ( 56, 255,  56),   # car        - green
+    ( 56,  56, 255),   # cat        - blue
+    (255, 157,  56),   # cellphone  - orange
+    (161,  56, 255),   # dog        - purple
+    ( 56, 255, 255),   # person     - cyan
 ]
 
 

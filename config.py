@@ -8,8 +8,8 @@ import os
 # ── Dataset ──────────────────────────────────────────────────────────────────
 # Auto-detect environment: Colab / Kaggle / Local
 if os.path.exists('/content'):
-    # Google Colab — dataset downloaded via Roboflow to /content/dataset
-    DATA_ROOT = os.environ.get('YOLO_DATA_ROOT', '/content/dataset')
+    # Google Colab — project extracted from Drive zip to /content/yolov1
+    DATA_ROOT = os.environ.get('YOLO_DATA_ROOT', '/content/yolov1/data')
 elif os.path.exists('/kaggle/working'):
     # Kaggle
     DATA_ROOT = os.environ.get('YOLO_DATA_ROOT', '/kaggle/working/data')
@@ -72,7 +72,7 @@ AUG_HSV_SATURATION = 1.5        # saturation adjustment factor
 AUG_FLIP_PROB = 0.5             # horizontal flip probability
 
 # ── Inference ────────────────────────────────────────────────────────────────
-CONF_THRESHOLD = 0.1
+CONF_THRESHOLD = 0.01
 NMS_THRESHOLD = 0.5
 
 # ── Paths ────────────────────────────────────────────────────────────────────
