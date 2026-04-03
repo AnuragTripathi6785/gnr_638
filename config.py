@@ -41,7 +41,7 @@ IMAGE_SIZE = 448  # Input resolution as per the paper
 BATCH_SIZE = 64
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0005
-NUM_EPOCHS = 100
+NUM_EPOCHS = 75  # equivalent to ~500 Darknet iterations (391 imgs, batch=64)
 
 # Learning rate schedule (paper Section 2.2):
 #   First epochs: slowly raise from 1e-3 to 1e-2
