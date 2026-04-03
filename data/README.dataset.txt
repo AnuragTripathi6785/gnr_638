@@ -1,5 +1,5 @@
-# visdrone > 2025-02-20 3:34pm
-https://universe.roboflow.com/narendra-kumar-wpve9/visdrone-5qcjy
+# football-players-detection > 2022-12-05 11:49pm
+https://universe.roboflow.com/roboflow-jvuqo/football-players-detection-3zvbc
 
 Provided by a Roboflow user
 License: CC BY 4.0

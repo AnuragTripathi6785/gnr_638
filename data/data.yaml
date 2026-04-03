@@ -3,11 +3,11 @@ val: ../valid/images
 test: ../test/images
 
 nc: 4
-names: ['bike', 'car', 'person', 'tree']
+names: ['ball', 'goalkeeper', 'player', 'referee']
 
 roboflow:
-  workspace: narendra-kumar-wpve9
-  project: visdrone-5qcjy
-  version: 6
+  workspace: roboflow-jvuqo
+  project: football-players-detection-3zvbc
+  version: 1
   license: CC BY 4.0
-  url: https://universe.roboflow.com/narendra-kumar-wpve9/visdrone-5qcjy/dataset/6
+  url: https://universe.roboflow.com/roboflow-jvuqo/football-players-detection-3zvbc/dataset/1
