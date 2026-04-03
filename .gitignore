@@ -1,0 +1,12 @@
+.claude/
+__pycache__/
+*.pyc
+*.pth
+checkpoints/
+logs/
+data/
+.DS_Store
+*.zip
+sample_vis.jpg
+training_curves.png
+test_detections.png
