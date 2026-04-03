@@ -6,16 +6,26 @@ All hyperparameters follow the original CVPR 2016 paper by Redmon et al.
 import os
 
 # ── Dataset ──────────────────────────────────────────────────────────────────
-DATA_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
-TRAIN_IMG_DIR = os.path.join(DATA_ROOT, "train", "images")
-TRAIN_LABEL_DIR = os.path.join(DATA_ROOT, "train", "labels")
-VALID_IMG_DIR = os.path.join(DATA_ROOT, "valid", "images")
-VALID_LABEL_DIR = os.path.join(DATA_ROOT, "valid", "labels")
-TEST_IMG_DIR = os.path.join(DATA_ROOT, "test", "images")
-TEST_LABEL_DIR = os.path.join(DATA_ROOT, "test", "labels")
+# Auto-detect environment: Colab / Kaggle / Local
+if os.path.exists('/content'):
+    # Google Colab — dataset downloaded via Roboflow to /content/dataset
+    DATA_ROOT = os.environ.get('YOLO_DATA_ROOT', '/content/dataset')
+elif os.path.exists('/kaggle/working'):
+    # Kaggle
+    DATA_ROOT = os.environ.get('YOLO_DATA_ROOT', '/kaggle/working/data')
+else:
+    # Local
+    DATA_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
-# VisDrone subset classes
-CLASS_NAMES = ["bike", "car", "person", "tree"]
+TRAIN_IMG_DIR   = os.path.join(DATA_ROOT, "train", "images")
+TRAIN_LABEL_DIR = os.path.join(DATA_ROOT, "train", "labels")
+VALID_IMG_DIR   = os.path.join(DATA_ROOT, "valid", "images")
+VALID_LABEL_DIR = os.path.join(DATA_ROOT, "valid", "labels")
+TEST_IMG_DIR    = os.path.join(DATA_ROOT, "test",  "images")
+TEST_LABEL_DIR  = os.path.join(DATA_ROOT, "test",  "labels")
+
+# Football Players Detection classes
+CLASS_NAMES = ["ball", "goalkeeper", "player", "referee"]
 NUM_CLASSES = len(CLASS_NAMES)  # C = 4
 
 # ── YOLO Grid ────────────────────────────────────────────────────────────────
@@ -31,7 +41,7 @@ IMAGE_SIZE = 448  # Input resolution as per the paper
 BATCH_SIZE = 64
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0005
-NUM_EPOCHS = 135
+NUM_EPOCHS = 50
 
 # Learning rate schedule (paper Section 2.2):
 #   First epochs: slowly raise from 1e-3 to 1e-2
@@ -66,8 +76,15 @@ CONF_THRESHOLD = 0.1
 NMS_THRESHOLD = 0.5
 
 # ── Paths ────────────────────────────────────────────────────────────────────
-CHECKPOINT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "checkpoints")
-LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+if os.path.exists('/content'):
+    CHECKPOINT_DIR = '/content/checkpoints'
+    LOG_DIR        = '/content/logs'
+elif os.path.exists('/kaggle/working'):
+    CHECKPOINT_DIR = '/kaggle/working/checkpoints'
+    LOG_DIR        = '/kaggle/working/logs'
+else:
+    CHECKPOINT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "checkpoints")
+    LOG_DIR        = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
 
 # Device
 DEVICE = "cuda"  # will fall back to cpu in code if not available
