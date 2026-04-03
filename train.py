@@ -170,7 +170,7 @@ def main():
         t_start = time.time()
 
         # Update learning rate (manual schedule as in the paper)
-        lr = 1e-4
+        lr = get_lr(epoch)
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
 

@@ -23,7 +23,7 @@ from config import S, B, NUM_CLASSES, LAMBDA_COORD, LAMBDA_NOOBJ
 def compute_iou(box1, box2):
     # Use ellipsis (...) to keep all batch and grid dimensions safe
     # Use slicing (0:1 instead of 0) to maintain the last dimension for broadcasting
-    
+
     b1_x1 = box1[..., 0:1] - box1[..., 2:3] / 2
     b1_y1 = box1[..., 1:2] - box1[..., 3:4] / 2
     b1_x2 = box1[..., 0:1] + box1[..., 2:3] / 2
@@ -43,7 +43,7 @@ def compute_iou(box1, box2):
 
     b1_area = abs((b1_x2 - b1_x1) * (b1_y2 - b1_y1))
     b2_area = abs((b2_x2 - b2_x1) * (b2_y2 - b2_y1))
-    
+
     # Add a tiny epsilon (1e-6) to prevent division by zero
     union_area = b1_area + b2_area - inter_area + 1e-6
 
@@ -83,37 +83,19 @@ class YOLOv1Loss(nn.Module):
         N = predictions.size(0)
 
         # ── Parse predictions and targets ────────────────────────────────────
-        # predictions[:, :, :, :B*5]  → B boxes, each (x, y, w, h, conf)
-        # predictions[:, :, :, B*5:]  → C class probabilities
-
         pred_boxes = predictions[..., :self.B * 5].contiguous().view(
             N, self.S, self.S, self.B, 5)
         pred_class = predictions[..., self.B * 5:]
 
-        # Target is encoded with only the first box slot filled (the GT box)
-        # target[:, :, :, 0:5] = (x, y, w, h, obj_flag)
-        # target[:, :, :, 5:10] = zeros (second box slot, unused in target)
-        # target[:, :, :, 10:14] = class one-hot
         tgt_boxes = targets[..., :self.B * 5].contiguous().view(
             N, self.S, self.S, self.B, 5)
         tgt_class = targets[..., self.B * 5:]
 
-        # Object mask: 1^obj_i — which cells contain an object
-        # We use the confidence flag from the first box slot in the target
-        obj_mask = tgt_boxes[..., 0, 4]  # (N, S, S) — 1 if object present
+        # Object mask: 1^obj_i
+        obj_mask = tgt_boxes[..., 0, 4]  # (N, S, S)
 
-        # ── Determine responsible predictor (1^obj_ij) ───────────────────────
-        # For each cell with an object, find which of the B predicted boxes
-        # has the highest IOU with the ground truth box.
-
-        # Ground truth box (same for all B predictors in a cell)
+        # Ground truth box
         gt_box = tgt_boxes[:, :, :, 0, :4]  # (N, S, S, 4)
-
-        # We need to convert predicted (x, y) which are cell-relative offsets
-        # to image-relative coordinates for IOU computation.
-        # pred x, y are offsets within the cell (0..1)
-        # To get absolute: x_abs = (col + x_offset) / S,  y_abs = (row + y_offset) / S
-        # w, h are already relative to the whole image (as in the paper)
 
         # Create cell offset grids
         cell_y, cell_x = torch.meshgrid(
@@ -132,17 +114,16 @@ class YOLOv1Loss(nn.Module):
         pred_y_abs = (cell_y.view(1, self.S, self.S, 1, 1) + pred_xy[..., 1:2]) / self.S
         pred_boxes_abs = torch.cat([pred_x_abs, pred_y_abs, pred_wh], dim=-1)
 
-        # GT box absolute coords — same for all B (broadcast)
-        gt_x = gt_box[..., 0:1]  # already cell-offset
+        # GT box absolute coords
+        gt_x = gt_box[..., 0:1]
         gt_y = gt_box[..., 1:2]
         gt_wh = gt_box[..., 2:4]
-        
-        # FIX: Removed .squeeze(-1) so shapes match properly!
-        # cell_x is already (1, S, S, 1), and gt_x is (N, S, S, 1)
-        gt_x_abs = (cell_x + gt_x) / self.S  
-        gt_y_abs = (cell_y + gt_y) / self.S  
-        
-        gt_box_abs = torch.cat([gt_x_abs, gt_y_abs, gt_wh], dim=-1)  # Exactly (N, S, S, 4)
+
+        # cell_x is (1, S, S, 1), gt_x is (N, S, S, 1) — no squeeze needed
+        gt_x_abs = (cell_x + gt_x) / self.S
+        gt_y_abs = (cell_y + gt_y) / self.S
+        gt_box_abs = torch.cat([gt_x_abs, gt_y_abs, gt_wh], dim=-1)  # (N, S, S, 4)
+
         # Compute IOU for each predictor
         ious = torch.zeros(N, self.S, self.S, self.B, device=predictions.device)
         for b in range(self.B):
@@ -164,9 +145,6 @@ class YOLOv1Loss(nn.Module):
         responsible = responsible * obj_mask_expanded  # (N, S, S, B)
 
         # ── Loss Term 1 & 2: Coordinate Loss ────────────────────────────────
-        # Only for responsible predictors in cells with objects
-
-        # pred and gt xy (cell-relative)
         pred_xy_resp = pred_boxes[..., :2]   # (N, S, S, B, 2)
         gt_xy = gt_box[..., :2].unsqueeze(3).expand_as(pred_xy_resp)
 
@@ -180,7 +158,6 @@ class YOLOv1Loss(nn.Module):
         pred_wh_resp = pred_boxes[..., 2:4]  # (N, S, S, B, 2)
         gt_wh_exp = gt_wh.unsqueeze(3).expand_as(pred_wh_resp)
 
-        # Clamp to avoid sqrt of negative (predictions can be negative early in training)
         pred_wh_sqrt = torch.sign(pred_wh_resp) * torch.sqrt(torch.abs(pred_wh_resp) + 1e-6)
         gt_wh_sqrt = torch.sqrt(gt_wh_exp + 1e-6)
 
@@ -191,9 +168,6 @@ class YOLOv1Loss(nn.Module):
         # ── Loss Term 3: Confidence loss for responsible (object) ────────────
         pred_conf = pred_boxes[..., 4]  # (N, S, S, B)
 
-        # Target confidence = IOU (detached) for responsible, 0 otherwise
-        # As per the paper: we want the confidence score to equal the IOU
-        # between predicted box and ground truth
         target_conf_obj = ious.detach() * responsible
 
         obj_conf_loss = torch.sum(
@@ -201,15 +175,12 @@ class YOLOv1Loss(nn.Module):
         )
 
         # ── Loss Term 4: Confidence loss for non-responsible (no-object) ─────
-        noobj_mask = 1.0 - responsible  # includes cells without objects too
-        # For cells without objects, target confidence is 0
-        # For cells with objects but non-responsible predictor, target is also 0
+        noobj_mask = 1.0 - responsible
         noobj_conf_loss = self.lambda_noobj * torch.sum(
             noobj_mask * (pred_conf - 0) ** 2
         )
 
         # ── Loss Term 5: Classification loss ─────────────────────────────────
-        # Only for cells that contain objects
         class_loss = torch.sum(
             obj_mask.unsqueeze(-1) * (pred_class - tgt_class) ** 2
         )
