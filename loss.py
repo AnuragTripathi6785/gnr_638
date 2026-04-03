@@ -168,7 +168,11 @@ class YOLOv1Loss(nn.Module):
         # ── Loss Term 3: Confidence loss for responsible (object) ────────────
         pred_conf = pred_boxes[..., 4]  # (N, S, S, B)
 
-        target_conf_obj = ious.detach() * responsible
+        # Use 1.0 as confidence target for responsible predictor (not IOU).
+        # On a small dataset with 50 epochs, IOU-based targets start near 0
+        # (random predictions have ~0 IOU), creating a vicious cycle where the
+        # model never learns to output high confidence.  Target=1 breaks the cycle.
+        target_conf_obj = responsible
 
         obj_conf_loss = torch.sum(
             responsible * (pred_conf - target_conf_obj) ** 2
