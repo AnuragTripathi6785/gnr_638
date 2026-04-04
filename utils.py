@@ -1,11 +1,3 @@
-"""
-Utility functions for YOLOv1:
-  - Decode predictions to bounding boxes
-  - Non-Maximum Suppression (NMS)
-  - Mean Average Precision (mAP) computation
-  - Visualization helpers
-"""
-
 import torch
 import numpy as np
 from collections import defaultdict
@@ -15,34 +7,21 @@ from config import S, B, NUM_CLASSES, CLASS_NAMES, CONF_THRESHOLD, NMS_THRESHOLD
 
 def decode_predictions(predictions, conf_thresh=CONF_THRESHOLD):
     """
-    Decode the (N, S, S, B*5 + C) tensor into a list of detections.
-
-    At test time, class-specific confidence = Pr(Class_i | Object) * IOU
-    As per Eq. (1) in the paper:
-        Pr(Class_i) * Pr(Object) * IOU = Pr(Class_i) * Confidence
-
-    Args:
-        predictions: (N, S, S, B*5+C) tensor
-        conf_thresh: minimum class-specific confidence to keep
-
-    Returns:
-        all_detections: list of length N, where each element is a tensor
-                        of shape (num_dets, 7):
-                        [x1, y1, x2, y2, confidence, class_conf, class_id]
+    Decode (N, S, S, B*5+C) tensor into a list of detections.
+    Returns list of length N, each element is tensor (num_dets, 7):
+    [x1, y1, x2, y2, obj_conf, class_conf, class_id]
     """
     N = predictions.size(0)
     all_detections = []
 
     for n in range(N):
-        pred = predictions[n]  # (S, S, B*5+C)
+        pred = predictions[n]
         detections = []
 
         for j in range(S):
             for i in range(S):
                 cell = pred[j, i]
-
-                # Class probabilities: Pr(Class_i | Object)
-                class_probs = cell[B * 5:]  # (C,)
+                class_probs = cell[B * 5:]
 
                 for b in range(B):
                     box_start = b * 5
@@ -52,22 +31,17 @@ def decode_predictions(predictions, conf_thresh=CONF_THRESHOLD):
                     h = cell[box_start + 3]
                     conf = cell[box_start + 4]
 
-                    # Class-specific confidence scores
-                    class_scores = class_probs * conf  # Pr(Class_i) * IOU
-
-                    # Best class
+                    class_scores = class_probs * conf
                     class_conf, class_id = class_scores.max(0)
 
                     if class_conf.item() < conf_thresh:
                         continue
 
-                    # Convert to absolute image coordinates (0..1)
                     cx = (i + x_offset.item()) / S
                     cy = (j + y_offset.item()) / S
                     bw = abs(w.item())
                     bh = abs(h.item())
 
-                    # Convert to corner format
                     x1 = cx - bw / 2
                     y1 = cy - bh / 2
                     x2 = cx + bw / 2
@@ -85,32 +59,18 @@ def decode_predictions(predictions, conf_thresh=CONF_THRESHOLD):
 
 
 def nms(detections, iou_threshold=NMS_THRESHOLD):
-    """
-    Non-Maximum Suppression — per class.
-
-    Args:
-        detections: tensor (num_dets, 7)
-                    [x1, y1, x2, y2, obj_conf, class_conf, class_id]
-        iou_threshold: NMS IoU threshold
-
-    Returns:
-        filtered: tensor (num_kept, 7)
-    """
+    """Per-class Non-Maximum Suppression."""
     if detections.numel() == 0:
         return detections
 
     kept = []
-
-    # Get unique classes
     classes = detections[:, 6].unique()
 
     for cls in classes:
         cls_mask = detections[:, 6] == cls
         cls_dets = detections[cls_mask]
 
-        # Sort by class confidence (descending)
-        scores = cls_dets[:, 5]
-        order = scores.argsort(descending=True)
+        order = cls_dets[:, 5].argsort(descending=True)
         cls_dets = cls_dets[order]
 
         keep = []
@@ -118,11 +78,7 @@ def nms(detections, iou_threshold=NMS_THRESHOLD):
             keep.append(cls_dets[0])
             if cls_dets.size(0) == 1:
                 break
-
-            # Compute IoU of the best box with all remaining
-            ious = _box_iou(cls_dets[0, :4].unsqueeze(0),
-                            cls_dets[1:, :4])  # (remaining,)
-            # Keep boxes with IoU < threshold
+            ious = _box_iou(cls_dets[0, :4].unsqueeze(0), cls_dets[1:, :4])
             mask = ious < iou_threshold
             cls_dets = cls_dets[1:][mask]
 
@@ -134,11 +90,7 @@ def nms(detections, iou_threshold=NMS_THRESHOLD):
 
 
 def _box_iou(box1, box2):
-    """
-    IoU between one box and multiple boxes (corner format x1,y1,x2,y2).
-    box1: (1, 4)  box2: (M, 4)
-    Returns: (M,)
-    """
+    """IoU between one box (1,4) and multiple boxes (M,4). Returns (M,)."""
     inter_x1 = torch.max(box1[:, 0], box2[:, 0])
     inter_y1 = torch.max(box1[:, 1], box2[:, 1])
     inter_x2 = torch.min(box1[:, 2], box2[:, 2])
@@ -155,10 +107,7 @@ def _box_iou(box1, box2):
 
 
 def compute_ap(recall, precision):
-    """
-    Compute Average Precision using the 11-point interpolation method
-    (standard for PASCAL VOC).
-    """
+    """11-point interpolated AP (PASCAL VOC protocol)."""
     ap = 0.0
     for t in np.linspace(0, 1, 11):
         mask = recall >= t
@@ -169,19 +118,11 @@ def compute_ap(recall, precision):
 
 def compute_map(all_pred_boxes, all_gt_boxes, iou_threshold=0.5, num_classes=NUM_CLASSES):
     """
-    Compute mean Average Precision across all classes.
-
-    Args:
-        all_pred_boxes: list of (num_preds, 7) tensors per image
-                        [x1, y1, x2, y2, obj_conf, class_conf, class_id]
-        all_gt_boxes:   list of (num_gts, 6) tensors per image
-                        [x1, y1, x2, y2, class_id, difficult(0/1)]
-
-    Returns:
-        mAP: float
-        per_class_ap: dict {class_name: ap}
+    Compute mAP across all classes.
+    all_pred_boxes: list of (num_preds, 7) tensors per image
+    all_gt_boxes:   list of (num_gts, 6) tensors per image
+    Returns: mAP (float), per_class_ap (dict)
     """
-    # Gather all predictions and ground truths per class
     pred_per_class = defaultdict(list)
     gt_per_class = defaultdict(list)
     n_gt_per_class = defaultdict(int)
@@ -216,14 +157,11 @@ def compute_map(all_pred_boxes, all_gt_boxes, iou_threshold=0.5, num_classes=NUM
             aps[cls] = 0.0
             continue
 
-        # Sort predictions by confidence
         preds = sorted(preds, key=lambda x: x['conf'], reverse=True)
 
-        # Reset matched flags
         for g in gts_list:
             g['matched'] = False
 
-        # Group gts by image for efficient lookup
         gts_by_img = defaultdict(list)
         for g in gts_list:
             gts_by_img[g['img_idx']].append(g)
@@ -255,7 +193,6 @@ def compute_map(all_pred_boxes, all_gt_boxes, iou_threshold=0.5, num_classes=NUM
             else:
                 fp[i] = 1
 
-        # Compute precision/recall
         tp_cumsum = np.cumsum(tp)
         fp_cumsum = np.cumsum(fp)
         recall = tp_cumsum / (n_gt + 1e-6)
@@ -271,10 +208,8 @@ def compute_map(all_pred_boxes, all_gt_boxes, iou_threshold=0.5, num_classes=NUM
 
 def get_gt_boxes_for_eval(targets):
     """
-    Convert target tensors (N, S, S, B*5+C) back to bounding boxes for
-    mAP evaluation.
-
-    Returns: list of (num_gts, 6) tensors  [x1, y1, x2, y2, class_id, 0]
+    Convert target tensors (N, S, S, B*5+C) to list of (num_gts, 6) tensors
+    [x1, y1, x2, y2, class_id, 0] for mAP evaluation.
     """
     N = targets.size(0)
     all_boxes = []
@@ -284,7 +219,7 @@ def get_gt_boxes_for_eval(targets):
         boxes = []
         for j in range(S):
             for i in range(S):
-                if target[j, i, 4] > 0.5:  # object present
+                if target[j, i, 4] > 0.5:
                     x_off = target[j, i, 0].item()
                     y_off = target[j, i, 1].item()
                     w = target[j, i, 2].item()
@@ -298,7 +233,6 @@ def get_gt_boxes_for_eval(targets):
                     x2 = cx + w / 2
                     y2 = cy + h / 2
 
-                    # Class
                     class_start = B * 5
                     cls_probs = target[j, i, class_start:class_start + NUM_CLASSES]
                     cls_id = cls_probs.argmax().item()

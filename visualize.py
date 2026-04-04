@@ -1,10 +1,3 @@
-"""
-Visualization utilities for YOLOv1.
-
-Draw the 7×7 grid, bounding boxes, and class labels on images
-to help debug and understand the model's predictions.
-"""
-
 import os
 import torch
 import numpy as np
@@ -14,25 +7,24 @@ from config import S, B, NUM_CLASSES, CLASS_NAMES, IMAGE_SIZE
 
 
 COLORS = [
-    (255, 0, 0),       # bike - red
-    (0, 255, 0),       # car - green
-    (0, 0, 255),       # person - blue
-    (255, 255, 0),     # tree - yellow
+    (255, 0, 0),
+    (0, 255, 0),
+    (0, 0, 255),
+    (255, 255, 0),
+    (161, 56, 255),
+    (56, 255, 255),
 ]
 
 
 def draw_grid(image, S=7):
-    """Draw the S×S grid overlay on an image."""
     draw = ImageDraw.Draw(image)
     w, h = image.size
     cell_w = w / S
     cell_h = h / S
 
     for i in range(1, S):
-        # Vertical lines
         x = int(i * cell_w)
         draw.line([(x, 0), (x, h)], fill=(200, 200, 200), width=1)
-        # Horizontal lines
         y = int(i * cell_h)
         draw.line([(0, y), (w, y)], fill=(200, 200, 200), width=1)
 
@@ -40,13 +32,6 @@ def draw_grid(image, S=7):
 
 
 def draw_target_boxes(image, target, S=7):
-    """
-    Draw ground-truth boxes from the target tensor on an image.
-
-    Args:
-        image: PIL Image
-        target: (S, S, B*5+C) tensor
-    """
     draw = ImageDraw.Draw(image)
     w, h = image.size
 
@@ -79,26 +64,19 @@ def draw_target_boxes(image, target, S=7):
                 color = COLORS[cls_id % len(COLORS)]
 
                 draw.rectangle([x1, y1, x2, y2], outline=color, width=2)
-                label = CLASS_NAMES[cls_id]
-                draw.text((x1, y1 - 14), label, fill=color, font=font)
+                draw.text((x1, y1 - 14), CLASS_NAMES[cls_id], fill=color, font=font)
 
     return image
 
 
 def visualize_sample(dataset, idx, output_path="sample_vis.jpg"):
-    """Visualize a single dataset sample with grid and GT boxes."""
     img_tensor, target = dataset[idx]
-
-    # Convert tensor to PIL
     img_np = (img_tensor.permute(1, 2, 0).numpy() * 255).astype(np.uint8)
     img = Image.fromarray(img_np)
-
-    # Draw grid and boxes
     img = draw_grid(img)
     img = draw_target_boxes(img, target)
-
     img.save(output_path)
-    print(f"Saved visualization to {output_path}")
+    print(f"Saved to {output_path}")
     return img
 
 

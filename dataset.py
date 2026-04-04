@@ -1,14 +1,3 @@
-"""
-YOLOv1 Dataset — loads images and YOLO-format labels, applies the data
-augmentation described in Section 2.2 of the paper:
-  - Random scaling and translations of up to 20% of the original image size
-  - Randomly adjust exposure and saturation by up to a factor of 1.5 in HSV
-  - Random horizontal flip
-
-Labels are in YOLO format:  class_id  cx  cy  w  h  (all normalized 0-1)
-We encode them into the (S, S, B*5 + C) target tensor that the loss expects.
-"""
-
 import os
 import random
 import numpy as np
@@ -25,13 +14,6 @@ from config import (
 
 
 class YOLODataset(Dataset):
-    """
-    Args:
-        img_dir:   path to the images/ folder
-        label_dir: path to the labels/ folder
-        augment:   whether to apply data augmentation (True for training)
-    """
-
     def __init__(self, img_dir, label_dir, augment=False):
         self.img_dir = img_dir
         self.label_dir = label_dir
@@ -41,7 +23,6 @@ class YOLODataset(Dataset):
         self.C = NUM_CLASSES
         self.img_size = IMAGE_SIZE
 
-        # Collect image files
         self.img_files = sorted([
             f for f in os.listdir(img_dir)
             if f.lower().endswith(('.jpg', '.jpeg', '.png'))
@@ -51,13 +32,10 @@ class YOLODataset(Dataset):
         return len(self.img_files)
 
     def __getitem__(self, idx):
-        # ── Load image ───────────────────────────────────────────────────────
         img_name = self.img_files[idx]
         img_path = os.path.join(self.img_dir, img_name)
         img = Image.open(img_path).convert("RGB")
-        orig_w, orig_h = img.size
 
-        # ── Load labels ──────────────────────────────────────────────────────
         label_name = os.path.splitext(img_name)[0] + ".txt"
         label_path = os.path.join(self.label_dir, label_name)
 
@@ -73,64 +51,43 @@ class YOLODataset(Dataset):
 
         boxes = np.array(boxes, dtype=np.float32) if boxes else np.zeros((0, 5), dtype=np.float32)
 
-        # ── Data Augmentation (Section 2.2) ──────────────────────────────────
         if self.augment:
             img, boxes = self._augment(img, boxes)
 
-        # ── Resize to 448×448 ────────────────────────────────────────────────
         img = img.resize((self.img_size, self.img_size), Image.BILINEAR)
 
-        # ── Convert to tensor ────────────────────────────────────────────────
-        img_np = np.array(img, dtype=np.float32) / 255.0  # (H, W, 3)
-        img_tensor = torch.from_numpy(img_np).permute(2, 0, 1)  # (3, H, W)
+        img_np = np.array(img, dtype=np.float32) / 255.0
+        img_tensor = torch.from_numpy(img_np).permute(2, 0, 1)
 
-        # ── Encode target tensor ─────────────────────────────────────────────
         target = self._encode_target(boxes)
-
         return img_tensor, target
 
     def _augment(self, img, boxes):
-        """Apply the data augmentations described in the paper."""
         img_np = np.array(img, dtype=np.uint8)
         h, w = img_np.shape[:2]
 
-        # ── Random horizontal flip ───────────────────────────────────────────
+        # Horizontal flip
         if random.random() < AUG_FLIP_PROB:
             img_np = np.fliplr(img_np).copy()
             if len(boxes) > 0:
-                boxes[:, 1] = 1.0 - boxes[:, 1]  # flip cx
+                boxes[:, 1] = 1.0 - boxes[:, 1]
 
-        # ── Random scale and translate ───────────────────────────────────────
+        # Scale and translate
         scale = random.uniform(AUG_SCALE_RANGE[0], AUG_SCALE_RANGE[1])
-        max_tx = AUG_TRANSLATE
-        max_ty = AUG_TRANSLATE
-        tx = random.uniform(-max_tx, max_tx)
-        ty = random.uniform(-max_ty, max_ty)
+        tx = random.uniform(-AUG_TRANSLATE, AUG_TRANSLATE)
+        ty = random.uniform(-AUG_TRANSLATE, AUG_TRANSLATE)
 
-        # Apply affine: scale around center, then translate
         new_w = int(w * scale)
         new_h = int(h * scale)
         img_pil = Image.fromarray(img_np)
         img_pil = img_pil.resize((new_w, new_h), Image.BILINEAR)
 
-        # Create canvas and paste
         canvas = Image.new("RGB", (w, h), (128, 128, 128))
         paste_x = int(tx * w) + (w - new_w) // 2
         paste_y = int(ty * h) + (h - new_h) // 2
         canvas.paste(img_pil, (paste_x, paste_y))
 
-        # Adjust boxes
         if len(boxes) > 0:
-            # Scale and translate box centers
-            boxes[:, 1] = boxes[:, 1] * scale + (paste_x + new_w / 2 - w / 2) / w + (1 - scale) / 2
-            boxes[:, 2] = boxes[:, 2] * scale + (paste_y + new_h / 2 - h / 2) / h + (1 - scale) / 2
-            # Simpler: just apply the transform
-            # Actually let's redo this properly:
-            # The box center in pixel coords was: cx_px = boxes[:,1] * w,  cy_px = boxes[:,2] * h
-            # After scaling and pasting:
-            #   new_cx_px = boxes[:,1] * new_w + paste_x
-            #   new_cy_px = boxes[:,2] * new_h + paste_y
-            # Normalized: new_cx = new_cx_px / w
             new_cx = (boxes[:, 1] * new_w + paste_x) / w
             new_cy = (boxes[:, 2] * new_h + paste_y) / h
             new_bw = boxes[:, 3] * scale
@@ -141,77 +98,54 @@ class YOLODataset(Dataset):
             boxes[:, 3] = new_bw
             boxes[:, 4] = new_bh
 
-            # Clip and remove out-of-bounds boxes
             valid = (boxes[:, 1] > 0.01) & (boxes[:, 1] < 0.99) & \
                     (boxes[:, 2] > 0.01) & (boxes[:, 2] < 0.99) & \
                     (boxes[:, 3] > 0.005) & (boxes[:, 4] > 0.005)
             boxes = boxes[valid]
 
-            # Clip w, h
             if len(boxes) > 0:
                 boxes[:, 3] = np.clip(boxes[:, 3], 0, 1)
                 boxes[:, 4] = np.clip(boxes[:, 4], 0, 1)
 
         img_np = np.array(canvas, dtype=np.uint8)
 
-        # ── Random HSV jitter (exposure & saturation) ────────────────────────
-        # PIL does not support HSV mode; use matplotlib for the conversion.
+        # HSV jitter
         import matplotlib.colors as mcolors
         img_float = img_np.astype(np.float32) / 255.0
-        img_hsv_np = mcolors.rgb_to_hsv(img_float)  # values in [0, 1]
+        img_hsv = mcolors.rgb_to_hsv(img_float)
 
-        # Saturation channel (index 1)
         sat_factor = random.uniform(1.0 / AUG_HSV_SATURATION, AUG_HSV_SATURATION)
-        img_hsv_np[:, :, 1] = np.clip(img_hsv_np[:, :, 1] * sat_factor, 0, 1)
+        img_hsv[:, :, 1] = np.clip(img_hsv[:, :, 1] * sat_factor, 0, 1)
 
-        # Value/exposure channel (index 2)
         exp_factor = random.uniform(1.0 / AUG_HSV_EXPOSURE, AUG_HSV_EXPOSURE)
-        img_hsv_np[:, :, 2] = np.clip(img_hsv_np[:, :, 2] * exp_factor, 0, 1)
+        img_hsv[:, :, 2] = np.clip(img_hsv[:, :, 2] * exp_factor, 0, 1)
 
-        img = Image.fromarray((mcolors.hsv_to_rgb(img_hsv_np) * 255).astype(np.uint8))
+        img = Image.fromarray((mcolors.hsv_to_rgb(img_hsv) * 255).astype(np.uint8))
 
         return img, boxes
 
     def _encode_target(self, boxes):
-        """
-        Encode ground-truth boxes into the (S, S, B*5 + C) target tensor.
-
-        For each object, we determine which grid cell its center falls into.
-        We fill in the first box slot with (x_offset, y_offset, w, h, 1)
-        and set the class probabilities to a one-hot vector.
-
-        If multiple objects fall in the same cell, only the last one is kept
-        (a known limitation of YOLOv1).
-        """
+        """Encode boxes into (S, S, B*5+C) target tensor."""
         target = torch.zeros(self.S, self.S, self.B * 5 + self.C)
 
         for box in boxes:
             cls_id = int(box[0])
             cx, cy, bw, bh = box[1], box[2], box[3], box[4]
 
-            # Which grid cell?
-            gi = int(cx * self.S)  # column
-            gj = int(cy * self.S)  # row
-            gi = min(gi, self.S - 1)
-            gj = min(gj, self.S - 1)
+            gi = min(int(cx * self.S), self.S - 1)
+            gj = min(int(cy * self.S), self.S - 1)
 
-            # Offset within the cell (0..1)
             x_offset = cx * self.S - gi
             y_offset = cy * self.S - gj
 
-            # Fill first box slot: (x, y, w, h, obj_flag)
             target[gj, gi, 0] = float(x_offset)
             target[gj, gi, 1] = float(y_offset)
             target[gj, gi, 2] = float(bw)
             target[gj, gi, 3] = float(bh)
-            target[gj, gi, 4] = 1.0  # object present
+            target[gj, gi, 4] = 1.0
 
-            # Second box slot (indices 5-9) left as zeros in target
-            # (the loss will handle responsible predictor selection)
-
-            # Class probabilities (one-hot)
             class_start = self.B * 5
-            target[gj, gi, class_start:class_start + self.C] = 0  # reset
+            target[gj, gi, class_start:class_start + self.C] = 0
             if cls_id < self.C:
                 target[gj, gi, class_start + cls_id] = 1.0
 
@@ -223,7 +157,5 @@ if __name__ == "__main__":
     ds = YOLODataset(TRAIN_IMG_DIR, TRAIN_LABEL_DIR, augment=True)
     print(f"Dataset size: {len(ds)}")
     img, target = ds[0]
-    print(f"Image shape: {img.shape}")
-    print(f"Target shape: {target.shape}")
-    n_obj = (target[:, :, 4] > 0).sum().item()
-    print(f"Objects in target: {n_obj}")
+    print(f"Image: {img.shape}  Target: {target.shape}")
+    print(f"Objects: {(target[:, :, 4] > 0).sum().item()}")
