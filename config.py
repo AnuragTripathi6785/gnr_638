@@ -41,7 +41,7 @@ IMAGE_SIZE = 448  # Input resolution as per the paper
 BATCH_SIZE = 64
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0005
-NUM_EPOCHS = 3
+NUM_EPOCHS = 135  # paper-equivalent training (Section 2.2)
 
 # Learning rate schedule (paper Section 2.2):
 #   First epochs: slowly raise from 1e-3 to 1e-2
