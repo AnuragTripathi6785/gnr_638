@@ -45,6 +45,8 @@ Update `DATA_ROOT` in `config.py` if needed (defaults to `./data`).
 
 ### 3. Download pretrained backbone (optional but recommended)
 
+The original YOLOv1 paper pretrains the first 20 conv layers on ImageNet classification before fine-tuning for detection. We follow the same approach using the `extraction.conv.weights` file released by Redmon.
+
 ```bash
 wget https://pjreddie.com/media/files/extraction.conv.weights
 ```
