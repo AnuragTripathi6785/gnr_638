@@ -16,36 +16,59 @@ pretrained.py   load Darknet .weights backbone
 visualize.py    grid and GT box visualization
 ```
 
-## Dataset
+## How to Reproduce
 
-Hocmay dataset from Roboflow — 391 train / 112 val / 56 test images, 6 classes: bike, car, cat, cellphone, dog, person.
+Easiest way is to use the provided Colab notebook (`YOLOv1_Colab.ipynb`), which handles setup automatically. Steps below are for running locally.
 
-Expected folder layout:
+### 1. Clone and install dependencies
+
+```bash
+git clone https://github.com/AnuragTripathi6785/gnr_638.git
+cd gnr_638
+pip install torch torchvision pillow numpy matplotlib
+```
+
+### 2. Download the dataset
+
+Download the Hocmay dataset from Roboflow in YOLO format:
+https://universe.roboflow.com/suyogs-workspace-voqgn/hocmay1-39isr
+
+Place it as:
 ```
 data/
-  train/images/  train/labels/
-  valid/images/  valid/labels/
-  test/images/   test/labels/
+  train/images/   train/labels/
+  valid/images/   valid/labels/
+  test/images/    test/labels/
 ```
 
-## Training
+Update `DATA_ROOT` in `config.py` if needed (defaults to `./data`).
+
+### 3. Download pretrained backbone (optional but recommended)
+
+```bash
+wget https://pjreddie.com/media/files/extraction.conv.weights
+```
+
+Load it before training by calling `load_darknet_conv_weights(model, "extraction.conv.weights")` in `train.py` (see the Colab notebook for exact usage).
+
+### 4. Train
 
 ```bash
 python train.py
 ```
 
-Trains for 135 epochs with SGD (momentum 0.9, weight decay 5e-4). Checkpoints saved to `checkpoints/`.
+Trains for 135 epochs. Best checkpoint saved to `checkpoints/yolov1_best.pth`.
 
-To load the pretrained ImageNet backbone before training:
-```python
-from pretrained import load_darknet_conv_weights
-model = load_darknet_conv_weights(model, "extraction.conv.weights")
-```
-
-## Evaluation
+### 5. Evaluate
 
 ```bash
 python evaluate.py --checkpoint checkpoints/yolov1_best.pth --split valid
+```
+
+### 6. Run detection on images
+
+```bash
+python detect.py --checkpoint checkpoints/yolov1_best.pth --img-dir data/test/images --output-dir detections/
 ```
 
 ## Results
