@@ -42,8 +42,7 @@ def decode_predictions(predictions, conf_thresh=CONF_THRESHOLD):
                 cell = pred[j, i]
 
                 # Class probabilities: Pr(Class_i | Object)
-                # Apply softmax so they are non-negative and sum to 1
-                class_probs = torch.softmax(cell[B * 5:], dim=0)  # (C,)
+                class_probs = cell[B * 5:]  # (C,)
 
                 for b in range(B):
                     box_start = b * 5
@@ -51,8 +50,7 @@ def decode_predictions(predictions, conf_thresh=CONF_THRESHOLD):
                     y_offset = cell[box_start + 1]
                     w = cell[box_start + 2]
                     h = cell[box_start + 3]
-                    # Sigmoid ensures conf is in [0,1] (model output is raw/linear)
-                    conf = torch.sigmoid(cell[box_start + 4])
+                    conf = cell[box_start + 4]
 
                     # Class-specific confidence scores
                     class_scores = class_probs * conf  # Pr(Class_i) * IOU

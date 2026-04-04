@@ -72,7 +72,7 @@ AUG_HSV_SATURATION = 1.5        # saturation adjustment factor
 AUG_FLIP_PROB = 0.5             # horizontal flip probability
 
 # ── Inference ────────────────────────────────────────────────────────────────
-CONF_THRESHOLD = 0.01
+CONF_THRESHOLD = 0.20
 NMS_THRESHOLD = 0.5
 
 # ── Paths ────────────────────────────────────────────────────────────────────
